@@ -1,49 +1,74 @@
+# Import necessary libraries
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
+import seaborn as sns
+import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
-from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+import numpy as np
 
+# Load the dataset
+data_path = '/mnt/data/happiness.csv'
+data = pd.read_csv(data_path)
 
-data = pd.read_csv('happiness.csv')
+# Display the first few rows of the dataset
+print("Dataset Overview:")
+print(data.head())
 
-# 1. Data Cleaning (Handle missing values)
-data_cleaned = data.copy()
-numerical_cols = data_cleaned.select_dtypes(include=['float64', 'int64']).columns
-categorical_cols = data_cleaned.select_dtypes(include=['object']).columns
+# Basic information and summary of the dataset
+print("\nDataset Info:")
+print(data.info())
 
-# Fill missing numerical values with median and categorical with 'unknown'
-data_cleaned[numerical_cols] = data_cleaned[numerical_cols].fillna(data_cleaned[numerical_cols].median())
-data_cleaned[categorical_cols] = data_cleaned[categorical_cols].fillna('unknown')
+print("\nSummary Statistics:")
+print(data.describe())
 
-# 2. Univariate Analysis (Summary statistics)
-univariate_numeric_summary = data_cleaned.describe()
-univariate_categorical_summary = {col: data_cleaned[col].value_counts() for col in categorical_cols}
+# Step 1: Univariate Analysis
+print("\nUnivariate Analysis:")
+for column in data.select_dtypes(include=[np.number]).columns:
+    sns.histplot(data[column], kde=True)
+    plt.title(f'Univariate Analysis of {column}')
+    plt.show()
 
-# 3. Bivariate Analysis (Correlation and Cross-tabulation)
-correlation_matrix = data_cleaned.corr()
-cross_tab_workstat_happy = pd.crosstab(data_cleaned['workstat'], data_cleaned['happy'])
-cross_tab_income_happy = pd.crosstab(data_cleaned['income'], data_cleaned['happy'])
+# Step 2: Bivariate Analysis
+print("\nBivariate Analysis:")
+numeric_columns = data.select_dtypes(include=[np.number]).columns
+sns.pairplot(data[numeric_columns])
+plt.suptitle('Bivariate Pair Plot', y=1.02)
+plt.show()
 
-# 4. Multivariate Analysis: Dimensionality Reduction using PCA
+# Step 3: Principal Component Analysis (PCA)
+# Standardize the data before PCA
 scaler = StandardScaler()
-numerical_data_scaled = scaler.fit_transform(data_cleaned[numerical_cols])
+data_scaled = scaler.fit_transform(data[numeric_columns])
 
-# Perform PCA (reduce to 2 dimensions for visualization)
+# Applying PCA
 pca = PCA(n_components=2)
-pca_components = pca.fit_transform(numerical_data_scaled)
-data_cleaned['PCA1'] = pca_components[:, 0]
-data_cleaned['PCA2'] = pca_components[:, 1]
-pca_explained_variance = pca.explained_variance_ratio_
+pca_result = pca.fit_transform(data_scaled)
 
-# 5. Clustering using KMeans
-kmeans = KMeans(n_clusters=3, random_state=42)
-clusters = kmeans.fit_predict(numerical_data_scaled)
-data_cleaned['Cluster'] = clusters
+# Adding PCA results to the original data for visualization
+data['PCA1'] = pca_result[:, 0]
+data['PCA2'] = pca_result[:, 1]
 
-# Output
-print("Univariate Numeric Summary:", univariate_numeric_summary)
-print("Correlation Matrix:", correlation_matrix)
-print("Work Status vs Happiness Crosstab:\n", cross_tab_workstat_happy)
-print("Income vs Happiness Crosstab:\n", cross_tab_income_happy)
-print("PCA Explained Variance Ratio:", pca_explained_variance)
-print("Head of Data with PCA and Clusters:\n", data_cleaned[['PCA1', 'PCA2', 'Cluster']].head())
+# Plotting the PCA results
+plt.figure(figsize=(8, 6))
+sns.scatterplot(x='PCA1', y='PCA2', data=data)
+plt.title('2D PCA Result')
+plt.xlabel('Principal Component 1')
+plt.ylabel('Principal Component 2')
+plt.show()
+
+# Step 4: N-dimensional Analysis (using all available components)
+# Choosing the number of components based on the variance explained
+pca_full = PCA().fit(data_scaled)
+explained_variance = np.cumsum(pca_full.explained_variance_ratio_)
+
+plt.figure(figsize=(8, 6))
+plt.plot(range(1, len(explained_variance)+1), explained_variance, marker='o')
+plt.title('Explained Variance by Number of Components')
+plt.xlabel('Number of Components')
+plt.ylabel('Cumulative Explained Variance')
+plt.grid()
+plt.show()
+
+print("\nExplained Variance by Components:")
+for i, var in enumerate(explained_variance, start=1):
+    print(f'Component {i}: {var:.2f}')
